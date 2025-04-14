@@ -1,0 +1,128 @@
+1. Directory Management
+cd ~ # Change to the home directory
+
+2. File Handling
+Confirm the presence of the manifest file and verify its contents
+cat manifest.csv
+
+3. Activate QIIME Environment
+conda activate qiime2-amplicon-2024.10
+
+4. QIIME Data Import
+Import paired-end sequences into QIIME
+qiime tools import
+--type 'SampleData[PairedEndSequencesWithQuality]'
+--input-path manifest.tsv
+--output-path paired-end-demux.qza
+--input-format PairedEndFastqManifestPhred33V2
+
+# For single-end sequences
+qiime tools import \
+  --type 'SampleData[SequencesWithQuality]' \
+  --input-path manifest.tsv \
+  --output-path single-end-demux.qza \
+  --input-format SingleEndFastqManifestPhred33V2
+
+5. Removal of Primers for 16S
+For 16S (Paired-end Sequences)
+qiime cutadapt trim-paired \
+  --i-demultiplexed-sequences paired-end-demux.qza \
+  --p-front-f GTGYCAGCMGCCGCGGTAA \
+  --p-front-r GGACTACNVGGGTWTCTAAT \
+  --p-match-adapter-wildcards \
+  --p-discard-untrimmed \
+  --o-trimmed-sequences trimmed-seqs-16S.qza \
+  --verbose
+
+For 16S (Single-end Sequences)
+qiime cutadapt trim-single \
+  --i-demultiplexed-sequences single-end-demux.qza \
+  --p-front GTGYCAGCMGCCGCGGTAA \
+  --p-match-adapter-wildcards \
+  --p-discard-untrimmed \
+  --o-trimmed-sequences trimmed-seqs-16S.qza \
+  --verbosee
+Why Remove Primers and Adapters:
+Eliminate bias: Unwanted sequences (primers, adapters) can skew results, especially in taxonomic classification.
+Improve alignment: Ensures that sequences align correctly to reference databases, Increase accuracy: Cleaner data leads to more reliable downstream analyses, including diversity metrics and functional profiling.
+
+Primer Details: 16S Primers: Forward (GTGYCAGCMGCCGCGGTAA), Reverse (GGACTACNVGGGTWTCTAAT) : Primers are fused with partial TruSeq adapter sequences for Illumina sequencing.
+6. Visualize Imported Data
+Summarize and visualize the imported data
+qiime demux summarize
+--i-data trimmed-seqs-16S.qza
+--o-visualization trimmed-seqs-16S.qzv
+
+7. Denoise with DADA2
+DADA2 denoising for paired-end reads
+qiime dada2 denoise-paired
+--i-demultiplexed-seqs trimmed-seqs-16S.qza
+--p-trunc-len-f 240
+--p-trunc-len-r 160
+--o-table table240160.qza
+--o-representative-sequences rep-seqs240160.qza
+--o-denoising-stats denoising-stats240160.qza
+
+View DADA2 denoising stats
+qiime metadata tabulate
+--m-input-file denoising-stats240160.qza
+--o-visualization denoising-stats240160.qzv
+
+8. Assign Taxonomy to 16S Sequences
+qiime feature-classifier classify-sklearn
+--i-classifier silva-138-99-16S-classifier.qza
+--i-reads rep-seqs240160.qza
+--o-classification taxonomy.qza
+
+9. Filter for Prokaryotes (Archaea and Bacteria only)
+Filter the feature table and representative sequences to retain only prokaryotic sequences
+qiime taxa filter-table
+--i-table table240160.qza
+--i-taxonomy taxonomy.qza
+--p-include "d__Bacteria, d__Archaea"
+--o-filtered-table prokaryotes-table.qza
+
+qiime taxa filter-seqs
+--i-sequences rep-seqs240160.qza
+--i-taxonomy taxonomy.qza
+--p-include "d__Bacteria, d__Archaea"
+--o-filtered-sequences prokaryotes-rep-seqs.qza
+
+10. Exclude Mitochondria and Chloroplasts
+Filter out mitochondrial and chloroplast sequences
+qiime taxa filter-table
+--i-table prokaryotes-table.qza
+--i-taxonomy taxonomy.qza
+--p-exclude "d__Mitochondria, d__Chloroplast"
+--o-filtered-table non-mitochondria-chloroplast-table.qza
+
+qiime taxa filter-seqs
+--i-sequences prokaryotes-rep-seqs.qza
+--i-taxonomy taxonomy.qza
+--p-exclude "d__Mitochondria, d__Chloroplast"
+--o-filtered-sequences non-mitochondria-chloroplast-rep-seqs.qza
+
+11. Choose Sampling Depth
+Perform core metrics analysis with an appropriate sampling depth based on your data
+qiime diversity core-metrics-phylogenetic
+--i-phylogeny rooted-tree.qza
+--i-table non-mitochondria-chloroplast-table.qza
+--p-sampling-depth (choosen depth)
+--m-metadata-file metadata.tsv
+--output-dir core-metrics-results
+
+12. Generate Feature Table Summary
+qiime feature-table summarize
+--i-table non-mitochondria-chloroplast-table.qza
+--o-visualization non-mitochondria-chloroplast-table-summary.qzv
+
+13. Bar Plot for Taxa
+qiime taxa barplot
+--i-table non-mitochondria-chloroplast-table.qza
+--i-taxonomy taxonomy.qza
+--m-metadata-file metadata.tsv
+--o-visualization taxa-bar-plots.qzv
+
+14. Alpha and Beta Diversity
+Perform alpha and beta diversity analysis and visualizations as needed
+(as described in 18S r RNA analysis)
