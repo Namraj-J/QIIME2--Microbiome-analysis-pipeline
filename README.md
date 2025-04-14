@@ -1,4 +1,4 @@
-# QIIME2--Microbiome-analysis-pipeline
+# QIIME2--Microbiome-analysis-pipeline for 18S
 "Pipeline for microbiome analysis using QIIME 2"
 ## 1. Directory Management
 # Change to the home directory to ensure correct file handling.
@@ -20,8 +20,9 @@ qiime tools import \
   --output-path paired-end-demux.qza \
   --input-format PairedEndFastqManifestPhred33V2
 
-## 5. Primer Removal
-# Trim primers from the sequences using `qiime cutadapt`.
+## 5. Primer/Adapter Removal
+It is essential to remove primers and adapters from sequencing data to avoid biases and ensure accurate downstream analysis. Primers and adapters are often introduced during the amplification and sequencing steps and can interfere with taxonomic classification and alignment. Below are the steps for removing primers and adapters for 16S and 18S sequencing:
+For 18S (Paired-end Sequences)
 qiime cutadapt trim-paired \
   --i-demultiplexed-sequences paired-end-demux.qza \
   --p-front-f TTGTACACACCGCCC \
@@ -30,6 +31,12 @@ qiime cutadapt trim-paired \
   --p-discard-untrimmed \
   --o-trimmed-sequences trimmed-seqs-18S.qza \
   --verbose
+
+Why Remove Primers and Adapters:
+Eliminate bias: Unwanted sequences (primers, adapters) can skew results, especially in taxonomic classification.
+Improve alignment: Ensures that sequences align correctly to reference databases.
+Increase accuracy: Cleaner data leads to more reliable downstream analyses, including diversity metrics and functional profiling.
+18S Primers: Forward (TTGTACACACCGCCC), Reverse (CCTTCYGCAGGTTCACCTAC)
 
 ## 6. Visualize Imported Data
 # Summarize and visualize the imported data to inspect quality.
@@ -131,6 +138,12 @@ qiime diversity core-metrics-phylogenetic \
 
 # Alpha Diversity Visualization:
 qiime diversity alpha-group-significance \
+  --i-alpha-diversity core-metrics-results/observed_features_vector.qza \
+  --m-metadata-file metadata.tsv \
+  --o-visualization core-metrics-results/observed-otus-group-significance.qzv
+
+# Additional Alpha Diversity Metrics:
+qiime diversity alpha-group-significance \
   --i-alpha-diversity core-metrics-results/faith_pd_vector.qza \
   --m-metadata-file metadata.tsv \
   --o-visualization core-metrics-results/faith-pd-group-significance.qzv
@@ -140,7 +153,6 @@ qiime diversity alpha-group-significance \
   --m-metadata-file metadata.tsv \
   --o-visualization core-metrics-results/observed-otus-group-significance.qzv
 
-# Additional Alpha Diversity Metrics:
 qiime diversity alpha-group-significance \
   --i-alpha-diversity core-metrics-results/shannon_vector.qza \
   --m-metadata-file metadata.tsv \
@@ -150,6 +162,7 @@ qiime diversity alpha-group-significance \
   --i-alpha-diversity core-metrics-results/evenness_vector.qza \
   --m-metadata-file metadata.tsv \
   --o-visualization core-metrics-results/evenness-group-significance.qzv
+
 
 ## 16. Beta Diversity Visualization
 # Visualize beta diversity using PCoA plots.
@@ -162,14 +175,14 @@ qiime emperor plot \
 # Generate an alpha rarefaction curve to evaluate sequencing depth.
 qiime diversity alpha-rarefaction \
   --i-table filtered-phylum-table.qza \
-  --p-max-depth 9500 \
+  --p-max-depth 25500 \
   --m-metadata-file metadata.tsv \
-  --o-visualization alpha-rarefaction9500.qzv
+  --o-visualization alpha-rarefaction255000.qzv
 
 ## 18. Adonis Test Results for Environmental Factors
 # Perform the Adonis test to evaluate the influence of environmental factors on community composition.
 qiime diversity adonis \
   --i-distance-matrix bray_curtis_distance_matrix.qza \
   --m-metadata-file metadata.tsv \
-  --p-formula "Position + pH + EC + Nitrate + Total_N + Total_P + Arsenic + Cadmium + Chromium + Lead + Zinc" \
+  --p-formula " Sum of Environmental factors" \
   --o-visualization adonis_bray_curtis_all_factorsall.qzv
